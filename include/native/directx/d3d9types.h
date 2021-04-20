@@ -784,7 +784,7 @@ typedef enum _D3DFOGMODE {
     D3DFOG_FORCE_DWORD          = 0x7fffffff
 } D3DFOGMODE;
 
-typedef enum _D3DFORMAT {
+typedef enum _D3DFORMAT : DWORD {
     D3DFMT_UNKNOWN              =   0,
 
     D3DFMT_R8G8B8               =  20,

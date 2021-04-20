@@ -47,12 +47,12 @@ using ULONGLONG = uint64_t;
 
 using FLOAT    = float;
 
-struct GUID {
+typedef struct _GUID {
   uint32_t Data1;
   uint16_t Data2;
   uint16_t Data3;
   uint8_t  Data4[8];
-};
+} GUID;
 
 using UUID    = GUID;
 using REFIID  = const GUID&;
@@ -73,9 +73,12 @@ using WORD    = uint16_t;
 using HANDLE   = void*;
 using HMONITOR = HANDLE;
 using HDC      = HANDLE;
-using HMODULE  = HANDLE;
+#ifdef __x86_64__
+using HMODULE  = unsigned long long;
+#else
+using HMODULE  = unsigned int;
+#endif 
 using HWND     = HANDLE;
-using HKEY     = HANDLE;
 using COLORREF = DWORD;
 
 using LPSTR    = char*;
@@ -158,8 +161,14 @@ struct RGNDATA {
 
 #define CONST const
 
-constexpr BOOL TRUE  = 1;
-constexpr BOOL FALSE = 0;
+// Really wish we could use these, but nah. Source be like...
+//constexpr BOOL TRUE  = 1;
+//constexpr BOOL FALSE = 0;
+
+#undef TRUE
+#undef FALSE
+#define TRUE 1
+#define FALSE 0
 
 #define interface struct
 #define MIDL_INTERFACE(x) struct
