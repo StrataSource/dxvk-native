@@ -73,17 +73,15 @@ using WORD    = uint16_t;
 using HANDLE   = void*;
 using HMONITOR = HANDLE;
 using HDC      = HANDLE;
-#ifdef __x86_64__
-using HMODULE  = unsigned long long;
-#else
-using HMODULE  = unsigned int;
-#endif 
+using HMODULE  = void*;
 using HWND     = HANDLE;
 using COLORREF = DWORD;
 
 using LPSTR    = char*;
 using LPCSTR   = const char*;
 using LPCWSTR  = const wchar_t*;
+
+using HKEY = void*;
 
 struct LUID {
   DWORD LowPart;
