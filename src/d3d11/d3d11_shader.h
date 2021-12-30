@@ -51,6 +51,9 @@ namespace dxvk {
       return m_shader->debugName();
     }
     
+    void forceOverrideShader(Rc<DxvkShader>&& shader) {
+      m_shader = std::move(shader);
+    }
   private:
     
     Rc<DxvkShader> m_shader;

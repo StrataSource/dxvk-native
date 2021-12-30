@@ -495,7 +495,7 @@ namespace dxvk {
   /**
    * \brief Extended D3D11 device
    */
-  class D3D11DeviceExt : public ID3D11VkExtDevice1 {
+  class D3D11DeviceExt : public ID3D11VkExtDevice2 {
     
   public:
     
@@ -549,7 +549,23 @@ namespace dxvk {
             const D3D11_SAMPLER_DESC* pSamplerDesc,
             ID3D11SamplerState**      ppSamplerState,
             uint32_t*                 pDriverHandle);
-    
+
+     HRESULT STDMETHODCALLTYPE CreateVertexShaderSPIRV(
+            const void*             pShaderBytecode,
+            SIZE_T                  BytecodeLength,
+            ID3D11VertexShader**    ppVertexShader);
+
+     HRESULT STDMETHODCALLTYPE CreatePixelShaderSPIRV(
+            const void*             pShaderBytecode,
+            SIZE_T                  BytecodeLength,
+            ID3D11PixelShader**     ppPixelShader);
+
+     HRESULT STDMETHODCALLTYPE CreateInputLayoutSPIRV(
+            const D3D11_INPUT_ELEMENT_DESC* pInputElementDescs,
+            UINT                    NumElements,
+            const void*             pShaderBytecodeWithInputSignature,
+            SIZE_T                  BytecodeLength,
+            ID3D11InputLayout**     ppInputLayout);
   private:
     
     D3D11DXGIDevice* m_container;
