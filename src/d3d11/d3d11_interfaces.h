@@ -112,6 +112,11 @@ ID3D11VkExtDevice2 : public ID3D11VkExtDevice1 {
           SIZE_T                      BytecodeLength,
           ID3D11PixelShader**         ppPixelShader) = 0;
 
+  virtual HRESULT STDMETHODCALLTYPE CreateComputeShaderSPIRV(
+          const void*                 pShaderBytecode,
+          SIZE_T                      BytecodeLength,
+          ID3D11ComputeShader**       ppComputeShader) = 0;
+
   virtual HRESULT STDMETHODCALLTYPE CreateInputLayoutSPIRV(
           const D3D11_INPUT_ELEMENT_DESC* pInputElementDescs,
           UINT                        NumElements,

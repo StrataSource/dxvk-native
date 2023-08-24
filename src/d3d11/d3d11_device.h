@@ -560,6 +560,11 @@ namespace dxvk {
             SIZE_T                  BytecodeLength,
             ID3D11PixelShader**     ppPixelShader);
 
+     HRESULT STDMETHODCALLTYPE CreateComputeShaderSPIRV(
+            const void*             pShaderBytecode,
+            SIZE_T                  BytecodeLength,
+            ID3D11ComputeShader**   ppPixelShader);
+
      HRESULT STDMETHODCALLTYPE CreateInputLayoutSPIRV(
             const D3D11_INPUT_ELEMENT_DESC* pInputElementDescs,
             UINT                    NumElements,

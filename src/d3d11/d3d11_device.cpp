@@ -2731,16 +2731,16 @@ namespace dxvk {
     return true;
   }
 
-  HRESULT STDMETHODCALLTYPE D3D11DeviceExt::CreateVertexShaderSPIRV(const void* pShaderBytecode, SIZE_T BytecodeLength, ID3D11VertexShader** ppVertexShader) {
-    InitReturnPtr(ppVertexShader);
-    if (!ppVertexShader)
-        return S_FALSE;
+  template<VkShaderStageFlagBits stage, typename T_ShaderType, typename T_ShaderInterfacePointerType>
+  HRESULT CreateShaderSPIRV(const void* pShaderBytecode, SIZE_T BytecodeLength, T_ShaderInterfacePointerType* ppShader, D3D11Device* device) {
+    InitReturnPtr(ppShader);
+    if (!ppShader)
+      return S_FALSE;
 
     spv_reflect::ShaderModule mod(BytecodeLength, pShaderBytecode);
     if (mod.GetResult() != SPV_REFLECT_RESULT_SUCCESS)
       return E_FAIL;
-    std::vector<SpvReflectDescriptorBinding*> bindings;
-    std::vector<SpvReflectInterfaceVariable*> variables;
+
     uint32_t bindingCount, variableCount;
     auto res = mod.EnumerateDescriptorBindings(&bindingCount, nullptr);
     if (res != SPV_REFLECT_RESULT_SUCCESS)
@@ -2748,17 +2748,36 @@ namespace dxvk {
     res = mod.EnumerateInterfaceVariables(&variableCount, nullptr);
     if (res != SPV_REFLECT_RESULT_SUCCESS)
       return E_FAIL;
-    bindings.resize(bindingCount);
-    variables.resize(variableCount);
+    std::vector<SpvReflectDescriptorBinding*> bindings{bindingCount};
+    std::vector<SpvReflectInterfaceVariable*> variables{variableCount};
     mod.EnumerateDescriptorBindings(&bindingCount, bindings.data());
     mod.EnumerateInterfaceVariables(&variableCount, variables.data());
     std::vector<DxvkResourceSlot> slots;
+    slots.reserve(bindingCount);
+
     for (auto binding : bindings) {
       if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE || binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
-        slots.emplace_back(DxvkResourceSlot{binding->binding, VkDescriptorType(binding->descriptor_type), VkImageViewType(binding->type_description->traits.image.dim), VK_ACCESS_SHADER_READ_BIT});
+      {
+        auto bindingInfo = DxvkResourceSlot {
+                .type = VkDescriptorType(binding->descriptor_type),
+                .slot = binding->binding,
+                .view = VkImageViewType(binding->type_description->traits.image.dim),
+                .access = VkAccessFlags(VK_ACCESS_SHADER_READ_BIT)
+        };
+        slots.emplace_back(bindingInfo);
+      }
       else
-        slots.emplace_back(DxvkResourceSlot{binding->binding, VkDescriptorType(binding->descriptor_type), VK_IMAGE_VIEW_TYPE_MAX_ENUM, VK_ACCESS_UNIFORM_READ_BIT});
+      {
+        auto bindingInfo = DxvkResourceSlot {
+                .type = VkDescriptorType(binding->descriptor_type),
+                .slot = binding->binding,
+                .view = VK_IMAGE_VIEW_TYPE_MAX_ENUM,
+                .access = VkAccessFlags(VK_ACCESS_UNIFORM_READ_BIT)
+        };
+        slots.emplace_back(bindingInfo);
+      }
     }
+
     DxvkInterfaceSlots ifaceSlots;
     for (auto variable : variables) {
       switch (variable->storage_class) {
@@ -2774,73 +2793,28 @@ namespace dxvk {
     }
 
     SpirvCodeBuffer buffer(BytecodeLength / 4, reinterpret_cast<const uint32_t*>(pShaderBytecode));
-    auto shader = m_device->GetDXVKDevice()->createShader(VK_SHADER_STAGE_VERTEX_BIT, slots.size(), slots.data(), ifaceSlots, buffer);
+    auto shader = device->GetDXVKDevice()->createShader(stage, slots.size(), slots.data(), ifaceSlots, buffer);
 
-    Sha1Hash hash = Sha1Hash::compute(
-        pShaderBytecode, BytecodeLength);
-    shader->setShaderKey(DxvkShaderKey(VK_SHADER_STAGE_VERTEX_BIT, hash));
+    Sha1Hash hash = Sha1Hash::compute(pShaderBytecode, BytecodeLength);
+    shader->setShaderKey(DxvkShaderKey(stage, hash));
 
     D3D11CommonShader module;
     module.forceOverrideShader(std::move(shader));
-    m_device->GetDXVKDevice()->registerShader(module.GetShader());
-    *ppVertexShader = ref(new D3D11VertexShader(m_device, module));
+    device->GetDXVKDevice()->registerShader(module.GetShader());
+    *ppShader = ref(new T_ShaderType{device, module});
     return S_OK;
   }
 
+  HRESULT STDMETHODCALLTYPE D3D11DeviceExt::CreateVertexShaderSPIRV(const void* pShaderBytecode, SIZE_T BytecodeLength, ID3D11VertexShader** ppVertexShader) {
+    return CreateShaderSPIRV<VK_SHADER_STAGE_VERTEX_BIT, D3D11VertexShader>(pShaderBytecode, BytecodeLength, ppVertexShader, m_device);
+  }
+
   HRESULT STDMETHODCALLTYPE D3D11DeviceExt::CreatePixelShaderSPIRV(const void* pShaderBytecode, SIZE_T BytecodeLength, ID3D11PixelShader** ppPixelShader) {
-    InitReturnPtr(ppPixelShader);
-    if (!ppPixelShader)
-        return S_FALSE;
+    return CreateShaderSPIRV<VK_SHADER_STAGE_FRAGMENT_BIT, D3D11PixelShader>(pShaderBytecode, BytecodeLength, ppPixelShader, m_device);
+  }
 
-    spv_reflect::ShaderModule mod(BytecodeLength, pShaderBytecode);
-    if (mod.GetResult() != SPV_REFLECT_RESULT_SUCCESS)
-      return E_FAIL;
-    std::vector<SpvReflectDescriptorBinding*> bindings;
-    std::vector<SpvReflectInterfaceVariable*> variables;
-    uint32_t bindingCount, variableCount;
-    auto res = mod.EnumerateDescriptorBindings(&bindingCount, nullptr);
-    if (res != SPV_REFLECT_RESULT_SUCCESS)
-      return E_FAIL;
-    res = mod.EnumerateInterfaceVariables(&variableCount, nullptr);
-    if (res != SPV_REFLECT_RESULT_SUCCESS)
-      return E_FAIL;
-    bindings.resize(bindingCount);
-    variables.resize(variableCount);
-    mod.EnumerateDescriptorBindings(&bindingCount, bindings.data());
-    mod.EnumerateInterfaceVariables(&variableCount, variables.data());
-    std::vector<DxvkResourceSlot> slots;
-    for (auto binding : bindings) {
-      if (binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE || binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
-        slots.emplace_back(DxvkResourceSlot{binding->binding, VkDescriptorType(binding->descriptor_type), VkImageViewType(binding->type_description->traits.image.dim), VK_ACCESS_SHADER_READ_BIT});
-      else
-        slots.emplace_back(DxvkResourceSlot{binding->binding, VkDescriptorType(binding->descriptor_type), VK_IMAGE_VIEW_TYPE_MAX_ENUM, VK_ACCESS_UNIFORM_READ_BIT});
-    }
-    DxvkInterfaceSlots ifaceSlots;
-    for (auto variable : variables) {
-      switch (variable->storage_class) {
-        case spv::StorageClassInput:
-          ifaceSlots.inputSlots |= 1 << variable->location;
-          break;
-        case spv::StorageClassOutput:
-          ifaceSlots.outputSlots |= 1 << variable->location;
-          break;
-        default:
-          break;
-      }
-    }
-
-    SpirvCodeBuffer buffer(BytecodeLength / 4, reinterpret_cast<const uint32_t*>(pShaderBytecode));
-    auto shader = m_device->GetDXVKDevice()->createShader(VK_SHADER_STAGE_FRAGMENT_BIT, slots.size(), slots.data(), ifaceSlots, buffer);
-
-    Sha1Hash hash = Sha1Hash::compute(
-        pShaderBytecode, BytecodeLength);
-    shader->setShaderKey(DxvkShaderKey(VK_SHADER_STAGE_FRAGMENT_BIT, hash));
-
-    D3D11CommonShader module;
-    module.forceOverrideShader(std::move(shader));
-    m_device->GetDXVKDevice()->registerShader(module.GetShader());
-    *ppPixelShader = ref(new D3D11PixelShader(m_device, module));
-    return S_OK;
+  HRESULT STDMETHODCALLTYPE D3D11DeviceExt::CreateComputeShaderSPIRV(const void* pShaderBytecode, SIZE_T BytecodeLength, ID3D11ComputeShader** ppComputeShader) {
+    return CreateShaderSPIRV<VK_SHADER_STAGE_COMPUTE_BIT, D3D11ComputeShader>(pShaderBytecode, BytecodeLength, ppComputeShader, m_device);
   }
 
   HRESULT STDMETHODCALLTYPE D3D11DeviceExt::CreateInputLayoutSPIRV(
