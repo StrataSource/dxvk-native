@@ -37,6 +37,11 @@ namespace dxvk {
     info.width                = m_renderSize.width;
     info.height               = m_renderSize.height;
     info.layers               = m_renderSize.layers;
+
+    /* Insipred by CX Hack 20098: Force layer count to 1 so Apple's tiled GPUs don't preallocate
+     * huge amounts of memory for rasterization when there are no attachments. */
+    if (!m_attachmentCount)
+        info.layers           = 1;
     
     if (m_vkd->vkCreateFramebuffer(m_vkd->device(), &info, nullptr, &m_handle) != VK_SUCCESS)
       Logger::err("DxvkFramebuffer: Failed to create framebuffer object");
