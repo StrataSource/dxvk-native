@@ -6,7 +6,7 @@ vkcommon_src = [
 
 thread_dep = dependency('threads')
 
-vkcommon_deps = [ thread_dep, wsi_dep, lib_vulkan ]
+vkcommon_deps = [ thread_dep, wsi_dep ]
 
 vkcommon_lib = static_library('vkcommon', vkcommon_src,
   dependencies        : vkcommon_deps,
