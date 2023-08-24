@@ -50,6 +50,8 @@ function build_arch {
   opt_strip=
   if [ $opt_devbuild -eq 0 ]; then
     opt_strip=--strip
+  else
+    opt_strip=--debug
   fi
 
   meson --buildtype "release"                         \
