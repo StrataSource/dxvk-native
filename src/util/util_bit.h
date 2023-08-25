@@ -1,16 +1,29 @@
 #pragma once
 
-#ifndef _MSC_VER
-#if defined(__WINE__) && defined(__clang__)
-#pragma push_macro("_WIN32")
-#undef _WIN32
-#endif
-#include <x86intrin.h>
-#if defined(__WINE__) && defined(__clang__)
-#pragma pop_macro("_WIN32")
-#endif
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+  #define DXVK_ARCH_X86
+  #if defined(__x86_64__) || defined(_M_X64)
+    #define DXVK_ARCH_X86_64
+  #endif
+#elif defined(__aarch64__) || defined(_M_ARM64)
+  #define DXVK_ARCH_ARM64
 #else
-#include <intrin.h>
+#error "Unknown CPU Architecture"
+#endif
+
+#ifdef DXVK_ARCH_X86
+  #ifndef _MSC_VER
+    #if defined(__WINE__) && defined(__clang__)
+      #pragma push_macro("_WIN32")
+      #undef _WIN32
+    #endif
+    #include <x86intrin.h>
+    #if defined(__WINE__) && defined(__clang__)
+      #pragma pop_macro("_WIN32")
+    #endif
+  #else
+    #include <intrin.h>
+  #endif
 #endif
 
 #include "util_likely.h"
@@ -55,16 +68,25 @@ namespace dxvk::bit {
     return _tzcnt_u32(n);
     #elif defined(__BMI__)
     return __tzcnt_u32(n);
-    #elif defined(__GNUC__) || defined(__clang__)
+    #elif defined(DXVK_ARCH_X86) && (defined(__GNUC__) || defined(__clang__))
+    // tzcnt is encoded as rep bsf, so we can use it on all
+    // processors, but the behaviour of zero inputs differs:
+    // - bsf:   zf = 1, cf = ?, result = ?
+    // - tzcnt: zf = 0, cf = 1, result = 32
+    // We'll have to handle this case manually.
     uint32_t res;
     uint32_t tmp;
     asm (
+      "tzcnt %2, %0;"
       "mov  $32, %1;"
-      "bsf   %2, %0;"
+      "test  %2, %2;"
       "cmovz %1, %0;"
       : "=&r" (res), "=&r" (tmp)
-      : "r" (n));
+      : "r" (n)
+      : "cc");
     return res;
+    #elif defined(__GNUC__) || defined(__clang__)
+    return n != 0 ? __builtin_ctz(n) : 32;
     #else
     uint32_t r = 31;
     n &= -n;
@@ -144,7 +166,7 @@ namespace dxvk::bit {
   template<typename T>
   bool bcmpeq(const T* a, const T* b) {
     static_assert(alignof(T) >= 16);
-    #if defined(__GNUC__) || defined(__clang__) || defined(_MSC_VER)
+    #if defined(DXVK_ARCH_X86) && (defined(__GNUC__) || defined(__clang__) || defined(_MSC_VER))
     auto ai = reinterpret_cast<const __m128i*>(a);
     auto bi = reinterpret_cast<const __m128i*>(b);
 
@@ -297,9 +319,13 @@ namespace dxvk::bit {
 
   public:
 
-    class iterator: public std::iterator<std::input_iterator_tag,
-      uint32_t, uint32_t, const uint32_t*, uint32_t> {
+    class iterator {
     public:
+      using iterator_category = std::input_iterator_tag;
+      using value_type = uint32_t;
+      using difference_type = uint32_t;
+      using pointer = const uint32_t*;
+      using reference = uint32_t;
 
       explicit iterator(uint32_t flags)
         : m_mask(flags) { }
@@ -316,7 +342,16 @@ namespace dxvk::bit {
       }
 
       uint32_t operator * () const {
-        return bsf(m_mask);
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(__BMI__) && defined(DXVK_ARCH_X86)
+        uint32_t res;
+        asm ("tzcnt %1,%0"
+        : "=r" (res)
+        : "r" (m_mask)
+        : "cc");
+        return res;
+#else
+        return tzcnt(m_mask);
+#endif
       }
 
       bool operator == (iterator other) const { return m_mask == other.m_mask; }
