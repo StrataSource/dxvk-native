@@ -26,17 +26,19 @@ util_src_win32 = [
   'platform/util_string_win32.cpp'
 ]
 
-util_src_linux = [
-  'platform/util_luid_linux.cpp',
-  'platform/util_env_linux.cpp',
-  'platform/util_string_linux.cpp',
+util_src_posix = [
+  'platform/util_luid_posix.cpp',
+  'platform/util_env_posix.cpp',
+  'platform/util_string_posix.cpp',
   'platform/thread_native.cpp',
 ]
 
 if dxvk_platform == 'windows'
   util_src += util_src_win32
 elif dxvk_platform == 'linux'
-  util_src += util_src_linux
+  util_src += util_src_posix
+elif dxvk_platform == 'darwin'
+  util_src += util_src_posix
 else
   error('Unknown platform for util')
 endif
