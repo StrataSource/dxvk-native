@@ -27,6 +27,15 @@ if dxvk_compiler.get_id() == 'clang'
   if dxvk_compiler.has_argument('-Wno-microsoft-exception-spec')
     add_project_arguments('-Wno-microsoft-exception-spec', language: 'cpp')
   endif
+  if dxvk_compiler.has_argument('-Wno-extern-c-compat')
+    add_project_arguments('-Wno-extern-c-compat', language: 'cpp')
+  endif
+  if dxvk_compiler.has_argument('-Wno-unused-const-variable')
+    add_project_arguments('-Wno-unused-const-variable', language: 'cpp')
+  endif
+  if dxvk_compiler.has_argument('-Wno-missing-braces')
+    add_project_arguments('-Wno-missing-braces', language: 'cpp')
+  endif
 endif
 
 if not dxvk_is_msvc
